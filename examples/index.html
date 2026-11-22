@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>role-palette demo</title>
+<script src="../dist/role-palette.global.js"></script>
+<script>
+  // Applied in <head> so the saved look is on screen before the first paint.
+  window.looks = RolePalette.createLooks({
+    key: 'role-palette-demo',
+    layers: {
+      style: ['plain', 'ink', 'soft', 'terminal'],
+      font: ['sans', 'serif', 'mono'],
+      density: ['m', 's', 'l'],
+      size: ['m', 's', 'l'],
+    },
+    signals: {
+      danger: { family: 'red', fallback: { light: '#b3261e', dark: '#ff6b61' } },
+      success: { family: 'green', fallback: { light: '#1f7a3a', dark: '#5fd38a' } },
+    },
+    themes: {
+      clean: { name: 'Clean', blurb: 'A plain modern app that follows your system', mode: 'auto', style: 'plain', font: 'sans', density: 'm',
+        palette: { paper: '#f6f7f9', ink: '#15171c', accent: '#4f46e5', ornament: '#c7cdf5' } },
+      ledger: { name: 'Ledger', blurb: 'Inked borders on warm paper', mode: 'light', style: 'ink', font: 'serif', density: 'm',
+        palette: { paper: '#f4efe4', ink: '#1d1a16', accent: '#2a5d8f', ornament: '#b08a3e', signals: { danger: '#a8321f' } } },
+      night: { name: 'Night shift', blurb: 'Soft panels in deep blue', mode: 'dark', vivid: true, style: 'soft', font: 'sans', density: 'l',
+        palette: ['#0f1222', '#e6e9f5', '#7aa2ff', '#ff5d73', '#38d39f', '#5b4b8a'] },
+      phosphor: { name: 'Phosphor', blurb: 'Green screen, dashed frames', mode: 'dark', vivid: true, style: 'terminal', font: 'mono', density: 's',
+        palette: { paper: '#03140a', ink: '#c8ffd0', accent: '#5dff7a', ornament: '#14532d', signals: { danger: '#ff5c5c', success: '#5dff7a' } } },
+      meadow: { name: 'Meadow', blurb: 'Colours given jobs automatically from a list', mode: 'light', vivid: true, style: 'soft', font: 'serif', density: 'm',
+        palette: ['#fbf6e9', '#283618', '#606c38', '#dda15e', '#bc6c25', '#c1121f'] },
+    },
+    default: 'clean',
+  });
+  window.look = looks.load();
+  looks.apply(look);
+</script>
+<style>
+  :root {
+    --paper: #f6f7f9; --panel: #fff; --ink: #15171c; --ink-soft: #545866; --hair: #d8dbe2; --field: #8a8f9c;
+    --accent: #4f46e5; --on-accent: #fff; --ornament: #c7cdf5; --danger: #b3261e; --success: #1f7a3a;
+    --gap: 14px;
+  }
+  :root[data-font="sans"] { --face: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  :root[data-font="serif"] { --face: Georgia, Cambria, 'Times New Roman', serif; }
+  :root[data-font="mono"] { --face: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace; }
+  :root[data-density="s"] { --gap: 8px; } :root[data-density="l"] { --gap: 22px; }
+  :root[data-size="s"] { font-size: 15px; } :root[data-size="m"] { font-size: 17px; } :root[data-size="l"] { font-size: 20px; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 1rem/1.5 var(--face, system-ui, sans-serif); transition: background .3s, color .3s; }
+  main { max-width: 960px; margin: 0 auto; padding: var(--gap) 16px 48px; display: grid; gap: var(--gap); }
+  h1 { margin: 8px 0 0; font-size: 1.6rem; }
+  h2 { margin: 0 0 8px; font-size: 1.05rem; }
+  p.lead { margin: 0; color: var(--ink-soft); }
+  .grid { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--panel); padding: calc(var(--gap) + 4px); }
+  .muted { color: var(--ink-soft); font-size: .9rem; }
+  .big { font-size: 2rem; font-weight: 700; }
+  .bad { color: var(--danger); font-weight: 600; }
+  .good { color: var(--success); font-weight: 600; }
+  button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--field); padding: 6px 12px; cursor: pointer; }
+  button[aria-pressed="true"], .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label { display: grid; gap: 4px; font-size: .9rem; color: var(--ink-soft); }
+  .themes { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .theme { text-align: left; padding: 12px; border: 2px solid var(--hair); display: grid; gap: 4px; }
+  .theme[aria-pressed="true"] { border-color: var(--accent); background: inherit; color: inherit; }
+  .theme b { font-size: 1.05rem; }
+  .swatches { display: flex; gap: 4px; }
+  .swatches i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(127,127,127,.4); }
+  .status { padding: 10px 12px; border-left: 4px solid var(--success); }
+  :root.mood-alert .status { border-left-color: var(--danger); }
+  .rule { height: 3px; background: var(--ornament); border: 0; margin: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  td { border-top: 1px solid var(--hair); padding: 4px 6px; }
+  td.ok { color: var(--success); } td.no { color: var(--danger); }
+
+  /* Structure styles: shape and decoration only, never colour values. */
+  :root[data-style="plain"] .card, :root[data-style="plain"] .theme, :root[data-style="plain"] button, :root[data-style="plain"] select { border-radius: 10px; }
+  :root[data-style="plain"] .card { border: 1px solid var(--hair); }
+  :root[data-style="ink"] .card { border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+  :root[data-style="ink"] button, :root[data-style="ink"] select { border: 2px solid var(--ink); }
+  :root[data-style="ink"] h2 { text-transform: uppercase; letter-spacing: .08em; border-bottom: 3px double var(--ornament); padding-bottom: 4px; }
+  :root[data-style="soft"] .card, :root[data-style="soft"] .theme { border: 0; border-radius: 20px; box-shadow: 0 6px 24px color-mix(in oklab, var(--ink) 14%, transparent); }
+  :root[data-style="soft"] button, :root[data-style="soft"] select { border-radius: 999px; }
+  :root[data-style="terminal"] .card { border: 1px dashed var(--accent); }
+  :root[data-style="terminal"] h2::before { content: '> '; color: var(--accent); }
+  :root[data-style="terminal"] button { text-transform: uppercase; }
+
+  /* Moods: the app reports state, each style shows it its own way. */
+  :root.mood-offline main { filter: grayscale(.85); }
+  @media (prefers-reduced-motion: no-preference) {
+    :root:not(.calm).mood-alert[data-style="soft"] body { animation: pulse 2.4s ease-in-out infinite; }
+    :root:not(.calm).mood-alert[data-style="plain"] .status { animation: nudge .5s ease-in-out 3; }
+    :root:not(.calm).mood-alert[data-style="terminal"] main { animation: flicker 2.2s steps(2) infinite; }
+    :root:not(.calm).mood-alert[data-style="ink"] .card { animation: shake .4s ease-in-out 2; }
+  }
+  :root.mood-alert[data-style="ink"] .status { border-left-width: 10px; }
+  @keyframes pulse { 50% { box-shadow: inset 0 0 90px color-mix(in oklab, var(--danger) 35%, transparent); } }
+  @keyframes nudge { 50% { transform: translateX(6px); } }
+  @keyframes flicker { 50% { opacity: .88; } }
+  @keyframes shake { 25% { transform: rotate(-.4deg); } 75% { transform: rotate(.4deg); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Greenhouse</h1>
+    <p class="lead">A made-up monitoring app, to show role-palette themes, layers and moods.</p>
+  </header>
+  <hr class="rule">
+
+  <section class="card">
+    <h2>Themes</h2>
+    <div class="themes" id="themes"></div>
+    <p class="muted" id="custom" hidden>Custom look: you've changed something since picking a theme.</p>
+  </section>
+
+  <section class="card">
+    <h2>Layers</h2>
+    <div class="row" id="layers"></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Temperature</h2>
+      <div class="big" id="temp">24°C</div>
+      <div class="status" id="status"><span class="good">✓ In range</span></div>
+    </div>
+    <div class="card">
+      <h2>Moods</h2>
+      <p class="muted">The app sets classes; each style decides the look.</p>
+      <div class="row">
+        <button id="alert" aria-pressed="false">Overheating</button>
+        <button id="offline" aria-pressed="false">Sensor offline</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Contrast audit</h2>
+      <table id="audit"></table>
+    </div>
+  </section>
+</main>
+<script>
+  const RP = RolePalette;
+  const root = document.documentElement;
+  const NAMES = { style: 'Frame', font: 'Lettering', density: 'Spacing', size: 'Text size', mode: 'Light or dark' };
+  const LABELS = { s: 'Small', m: 'Normal', l: 'Large', auto: 'Auto', light: 'Light', dark: 'Dark' };
+
+  function save(next) { window.look = looks.save(next); render(); }
+
+  function render() {
+    const current = looks.themeOf(look);
+    const box = document.getElementById('themes'); box.textContent = '';
+    for (const [id, th] of Object.entries(looks.themes)) {
+      const t = looks.tokens(looks.fromTheme(id));
+      const b = document.createElement('button');
+      b.className = 'theme';
+      b.setAttribute('aria-pressed', String(current === id));
+      b.style.cssText = `background:${t.paper};color:${t.ink};`;
+      b.innerHTML = `<b></b><span class="muted" style="color:${t['ink-soft']}"></span><span class="swatches">${['accent', 'ornament', 'danger', 'success'].map((k) => `<i style="background:${t[k]}"></i>`).join('')}</span>`;
+      b.querySelector('b').textContent = th.name;
+      b.querySelector('span').textContent = th.blurb;
+      b.onclick = () => save(looks.fromTheme(id, { size: look.size, mood: look.mood }));
+      box.appendChild(b);
+    }
+    document.getElementById('custom').hidden = !!current;
+
+    const layers = document.getElementById('layers'); layers.textContent = '';
+    const choices = { mode: ['auto', 'light', 'dark'], ...looks.layers };
+    for (const [layer, values] of Object.entries(choices)) {
+      const label = document.createElement('label'); label.textContent = NAMES[layer];
+      const sel = document.createElement('select');
+      for (const v of values) { const o = new Option(LABELS[v] || v[0].toUpperCase() + v.slice(1), v); o.selected = look[layer] === v; sel.add(o); }
+      sel.onchange = () => save({ ...look, [layer]: sel.value });
+      label.appendChild(sel); layers.appendChild(label);
+    }
+    const moodLabel = document.createElement('label'); moodLabel.textContent = 'Moods';
+    const moodBtn = document.createElement('button');
+    moodBtn.textContent = look.mood ? 'On' : 'Off'; moodBtn.setAttribute('aria-pressed', String(look.mood));
+    moodBtn.onclick = () => save({ ...look, mood: !look.mood });
+    moodLabel.appendChild(moodBtn); layers.appendChild(moodLabel);
+
+    const t = looks.tokens(look);
+    const audit = document.getElementById('audit');
+    audit.innerHTML = t ? RP.auditTokens(t, { danger: {}, success: {} }).map((r) =>
+      `<tr><td>${r.token}</td><td>${r.ratio.toFixed(1)} : 1</td><td class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ≥ ${r.min}</td></tr>`).join('') : '';
+  }
+
+  const state = { alert: false, offline: false };
+  for (const k of Object.keys(state)) {
+    const b = document.getElementById(k);
+    b.onclick = () => {
+      state[k] = !state[k];
+      b.setAttribute('aria-pressed', String(state[k]));
+      RP.setMoods(state);
+      document.getElementById('temp').textContent = state.alert ? '41°C' : '24°C';
+      document.getElementById('status').innerHTML = state.offline ? '<span class="muted">— No reading</span>'
+        : state.alert ? '<span class="bad">▲ Too hot</span>' : '<span class="good">✓ In range</span>';
+    };
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  render();
+</script>
+</body>
+</html>

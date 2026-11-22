@@ -1,0 +1,11 @@
+{
+  "name": "role-palette",
+  "owner": { "name": "hjelleyman" },
+  "plugins": [
+    {
+      "name": "role-palette",
+      "source": "./",
+      "description": "A skill for building app themes where every colour has one job, one palette gives readable light and dark versions, and the page reacts to app state."
+    }
+  ]
+}

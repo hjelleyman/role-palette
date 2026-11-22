@@ -1,0 +1,19 @@
+{
+  "name": "role-palette",
+  "version": "0.1.0",
+  "description": "Themes where every colour has one job: one palette makes readable light and dark versions, and the page can react to what your app is doing.",
+  "type": "module",
+  "main": "src/role-palette.js",
+  "exports": {
+    ".": "./src/role-palette.js",
+    "./global": "./dist/role-palette.global.js"
+  },
+  "files": ["src", "dist"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test tests/role-palette.test.js"
+  },
+  "keywords": ["theme", "palette", "oklab", "contrast", "dark-mode", "css-variables"],
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}
