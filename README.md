@@ -37,7 +37,7 @@ Then ask for themes, dark mode, an appearance page, or a contrast audit, and the
 No build step needed. As a classic script (so the saved look applies before the page paints):
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/hjelleyman/role-palette@v0.1.0/dist/role-palette.global.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/hjelleyman/role-palette@v0.2.0/dist/role-palette.global.js"></script>
 <script>
   const looks = RolePalette.createLooks({
     key: 'my-app-look',
@@ -68,7 +68,7 @@ Your CSS then uses `var(--paper)`, `var(--panel)`, `var(--ink)`, `var(--ink-soft
 | --- | --- |
 | `createLooks(config)` | A store for the user's look: `load`, `save`, `apply`, `normalize`, `fromTheme(id, keep)`, `themeOf(look)`, `tokens(look)` |
 | `themeCss(palette, { vivid, signals })` | CSS for light, system dark and forced dark (`data-theme`) |
-| `deriveTokens(palette, { dark, vivid, signals })` | The token colours as an object |
+| `deriveTokens(palette, { dark, vivid, signals, extend })` | The token colours as an object. `extend(tokens, { dark })` adds tokens your app needs, such as aliases |
 | `assignJobs(colours, signals)` | Turns any list of colours into `{ paper, ink, accent, ornament, signals }` |
 | `auditTokens(tokens, signals)` | Contrast ratio of each token against its target |
 | `setMoods({ alert: true })` | Toggles `mood-alert` on `<html>` |

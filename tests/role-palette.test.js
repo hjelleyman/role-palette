@@ -65,6 +65,15 @@ test('themeCss writes light, system dark and forced dark blocks', () => {
   assert.match(css, /:root\[data-theme="dark"\]\{/);
 });
 
+test('extend adds app tokens in both modes and reaches the CSS', () => {
+  const extend = (t, { dark }) => ({ sel: t.accent, mode: dark ? '#000000' : '#ffffff' });
+  const light = deriveTokens(PALETTES.paper, { extend });
+  assert.equal(light.sel, light.accent);
+  assert.equal(light.mode, '#ffffff');
+  assert.equal(deriveTokens(PALETTES.paper, { dark: true, extend }).mode, '#000000');
+  assert.match(themeCss(PALETTES.paper, { extend }), /--sel:#/);
+});
+
 test('normPalette rejects junk', () => {
   assert.throws(() => normPalette({ paper: 'red', ink: '#000000', accent: '#123456' }));
   assert.throws(() => assignJobs(['#ffffff']));

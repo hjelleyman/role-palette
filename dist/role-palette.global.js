@@ -141,8 +141,10 @@ function normPalette(p, signals) {
  * vivid keeps more of the palette's colour in the page background.
  * Tokens: paper, panel, ink, ink-soft, hair, field, accent, on-accent, ornament,
  *         inverse-bg, inverse-fg, and one per signal.
+ * extend(tokens, { dark, palette }) may return more tokens your app needs (aliases, toast colours,
+ * colours fitted against something other than the panel); they are added to the result.
  */
-function deriveTokens(palette, { dark = false, vivid = false, signals } = {}) {
+function deriveTokens(palette, { dark = false, vivid = false, signals, extend } = {}) {
   const r = normPalette(palette, signals);
   const sig = normSignals(signals);
   const paleIsPaper = lightness(r.paper) >= lightness(r.ink);
@@ -169,7 +171,7 @@ function deriveTokens(palette, { dark = false, vivid = false, signals } = {}) {
     const own = r.signals[name] || byChroma([r.accent, r.ornament].filter((h) => s.family !== 'any' && FAMILIES[s.family](h)))[0];
     t[name] = fit(own || s.fallback[dark ? 'dark' : 'light'], t.panel, s.min);
   }
-  return t;
+  return typeof extend === 'function' ? { ...t, ...extend({ ...t }, { dark, palette: r }) } : t;
 }
 
 const decl = (t, dark) => Object.entries(t).map(([k, v]) => `--${k}:${v};`).join('') + `color-scheme:${dark ? 'dark' : 'light'};`;
@@ -217,11 +219,12 @@ function setMoods(moods, root = globalThis.document && document.documentElement)
  *   default:  theme id to start from
  *   signals:  your app's signal colours (see DEFAULT_SIGNALS)
  *   fonts:    { fontValue: 'https://stylesheet-url' } loaded the first time that font is applied
+ *   extend:   extra tokens, as for deriveTokens
  * }
  * A look is { theme?, mode, vivid, mood, palette, ...one value per layer }.
  */
 function createLooks(config) {
-  const { key, layers = {}, themes = {}, signals, fonts = {} } = config;
+  const { key, layers = {}, themes = {}, signals, extend, fonts = {} } = config;
   const MODES = ['auto', 'light', 'dark'];
   const base = themes[config.default] || Object.values(themes)[0] || {};
   const loaded = new Set();
@@ -260,7 +263,7 @@ function createLooks(config) {
   /** The colours a look shows right now, for previews. */
   function tokens(look) {
     const l = normalize(look);
-    return l.palette ? deriveTokens(l.palette, { dark: l.mode === 'dark' || (l.mode === 'auto' && prefersDark()), vivid: l.vivid, signals }) : null;
+    return l.palette ? deriveTokens(l.palette, { dark: l.mode === 'dark' || (l.mode === 'auto' && prefersDark()), vivid: l.vivid, signals, extend }) : null;
   }
   function apply(look) {
     const l = normalize(look);
@@ -276,7 +279,7 @@ function createLooks(config) {
     }
     let el = doc.getElementById('role-palette-css');
     if (!el) { el = doc.createElement('style'); el.id = 'role-palette-css'; doc.head.appendChild(el); }
-    el.textContent = l.palette ? themeCss(l.palette, { vivid: l.vivid, signals }) : '';
+    el.textContent = l.palette ? themeCss(l.palette, { vivid: l.vivid, signals, extend }) : '';
     return l;
   }
   function load() {

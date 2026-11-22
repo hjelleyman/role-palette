@@ -1,6 +1,6 @@
 {
   "name": "role-palette",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A skill for building app themes where every colour has one job, one palette gives readable light and dark versions, and the page reacts to app state.",
   "author": { "name": "hjelleyman" },
   "license": "MIT",
