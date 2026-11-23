@@ -51,9 +51,12 @@ effort.
    the top of the theme code; it's the contract every theme keeps.
 3. **Refactor to tokens.** Replace literal colours with `var(--paper)`, `var(--ink)`,
    `var(--ink-soft)`, `var(--hair)`, `var(--field)`, `var(--panel)`, `var(--accent)`,
-   `var(--on-accent)`, `var(--ornament)`, `var(--inverse-bg)`, `var(--inverse-fg)` and one
-   `var(--<signal>)` per signal. Keep a sensible default in the stylesheet so the page works
-   before any theme is applied.
+   `var(--accent-hover)`, `var(--accent-soft)`, `var(--on-accent)`, `var(--ornament)`,
+   `var(--inverse-bg)`, `var(--inverse-fg)`, and per signal `var(--<signal>)`,
+   `var(--<signal>-soft)` (tinted background) and `var(--on-<signal>)` (text on the filled
+   colour). `hair` is for decorative dividers only; borders that show where a control is use
+   `field`. Keep a sensible default in the stylesheet so the page works before any theme is
+   applied.
 4. **Choose the layers.** Pick 2-7 structure styles and 2-7 letterings that suit the app's
    character. Write structure styles as `:root[data-style="x"] ...` rule sets that change
    borders, radii, shadows, backgrounds and decoration, never colour values.
@@ -67,8 +70,10 @@ effort.
 8. **Appearance UI.** Theme cards that preview their own colours and lettering, then per-layer
    controls (mode auto/light/dark, style, font, density, size, palette). Show "Custom" when
    the look no longer matches a theme.
-9. **Audit** with the checklist below. With the engine, `auditTokens(deriveTokens(p, opts))`
-   gives the ratios for each palette in light and dark.
+9. **Audit** with the checklist below. With the engine, `auditTokens(t, signals)` gives the
+   contrast of each token on every background it is used on, and `auditDistinct(t, signals)`
+   shows any signal that looks too much like the accent or another signal. Run both for each
+   palette in light and dark (`t = deriveTokens(p, { dark, vivid, signals })`).
 
 ## Using the engine
 
@@ -114,9 +119,13 @@ string and inject it once; keep layer attributes on `<html>`, not in component s
 
 - [ ] Every colour in the CSS is a token; no literal colours left in components
 - [ ] Each token has exactly one job; ornament never carries meaning
-- [ ] Each signal keeps its meaning (and hue family) in every theme
-- [ ] Text meets contrast: ink ≥ 7 (engine targets 11), secondary text ≥ 4.5, accent and
-      signals ≥ 4.5, form-field borders ≥ 3, in both light and dark, for every theme
+- [ ] Each signal keeps its meaning (and hue family) in every theme, and never looks like the
+      accent (no red accent when danger is red)
+- [ ] Text meets contrast on both paper and panel: ink ≥ 7 (engine targets 11), secondary text
+      ≥ 4.5, accent and signals ≥ 4.5, form-field borders ≥ 3, text on filled accent/signals
+      ≥ 4.5, in both light and dark, for every theme
+- [ ] Text size uses percentages or rem, never a px root size
+- [ ] Saved looks store the theme id, not a copy of its colours
 - [ ] State is never shown by colour alone (add an icon, word or shape)
 - [ ] Focus is visible in every structure style
 - [ ] Saved look applies before first paint; no flash on reload

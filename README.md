@@ -58,21 +58,32 @@ No build step needed. As a classic script (so the saved look applies before the 
 Or as an ES module: `import { createLooks, themeCss, setMoods } from 'role-palette'`.
 
 Your CSS then uses `var(--paper)`, `var(--panel)`, `var(--ink)`, `var(--ink-soft)`, `var(--hair)`,
-`var(--field)`, `var(--accent)`, `var(--on-accent)`, `var(--ornament)`, `var(--inverse-bg)`,
-`var(--inverse-fg)` and `var(--<signal>)`, and styles each `[data-style]`, `[data-font]`,
+`var(--field)`, `var(--accent)`, `var(--accent-hover)`, `var(--accent-soft)`, `var(--on-accent)`,
+`var(--ornament)`, `var(--inverse-bg)`, `var(--inverse-fg)`, and for each signal `var(--<signal>)`,
+`var(--<signal>-soft)` and `var(--on-<signal>)`. It styles each `[data-style]`, `[data-font]`,
 `[data-density]` and `[data-size]`.
+
+- Text and border tokens meet their targets on both `paper` and `panel`.
+- `-soft` tokens are tinted backgrounds that `ink` stays readable on (≥ 7:1), such as a selected
+  row or an error banner. `on-*` is text on a filled accent or signal (≥ 4.5:1).
+- `hair` is decorative (dividers). Use `field` for borders that show where a control is (≥ 3:1).
+- Set `data-size` with percentages, not px, so the user's browser text size still counts.
+
+`save()` stores the theme id plus only what the user changed, so when you update a theme, people
+who picked it get the update.
 
 ### API
 
 | Function | Does |
 | --- | --- |
-| `createLooks(config)` | A store for the user's look: `load`, `save`, `apply`, `normalize`, `fromTheme(id, keep)`, `themeOf(look)`, `tokens(look)` |
+| `createLooks(config)` | A store for the user's look: `load`, `save`, `apply`, `normalize`, `fromTheme(id, keep)`, `themeOf(look)`, `tokens(look)`, `compact(look)` (what `save` stores) |
 | `themeCss(palette, { vivid, signals })` | CSS for light, system dark and forced dark (`data-theme`) |
 | `deriveTokens(palette, { dark, vivid, signals, extend })` | The token colours as an object. `extend(tokens, { dark })` adds tokens your app needs, such as aliases |
 | `assignJobs(colours, signals)` | Turns any list of colours into `{ paper, ink, accent, ornament, signals }` |
-| `auditTokens(tokens, signals)` | Contrast ratio of each token against its target |
+| `auditTokens(tokens, signals)` | Contrast of each token against every background it is used on, with its target |
+| `auditDistinct(tokens, signals, min = 0.08)` | Whether each signal looks different enough from the accent, the ornament and the other signals |
 | `setMoods({ alert: true })` | Toggles `mood-alert` on `<html>` |
-| `contrast`, `fit`, `mix`, `withLightness`, `toOklab`, `fromOklab` | The colour maths |
+| `contrast`, `distance`, `fit`, `mix`, `withLightness`, `toOklab`, `fromOklab` | The colour maths. `fromOklab` reduces chroma (keeping hue) for colours outside sRGB |
 
 ## Bring your own palettes
 
