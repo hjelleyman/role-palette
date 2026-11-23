@@ -37,12 +37,29 @@ function toOklab(hex) {
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
   return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
 }
-function fromOklab([L, a, b]) {
+function oklabToLinear([L, a, b]) {
   const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
   const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
   const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  return '#' + [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s]
-    .map((v) => unlin(v).toString(16).padStart(2, '0')).join('');
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+}
+const inGamut = (rgb) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
+const linearHex = (rgb) => '#' + rgb.map((v) => unlin(v).toString(16).padStart(2, '0')).join('');
+/**
+ * OKLab to hex. Colours outside sRGB lose chroma (at the same lightness and hue) until they fit,
+ * instead of having each channel clipped, which would shift the hue.
+ */
+function fromOklab([L, a, b]) {
+  if (L <= 0) return '#000000';
+  if (L >= 1) return '#ffffff';
+  const rgb = oklabToLinear([L, a, b]);
+  if (inGamut(rgb)) return linearHex(rgb);
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i += 1) {
+    const k = (lo + hi) / 2;
+    if (inGamut(oklabToLinear([L, a * k, b * k]))) lo = k; else hi = k;
+  }
+  return linearHex(oklabToLinear([L, a * lo, b * lo]));
 }
 const lightness = (h) => toOklab(h)[0];
 const chroma = (h) => { const [, a, b] = toOklab(h); return Math.hypot(a, b); };
@@ -61,15 +78,24 @@ const luminance = (h) => { const [r, g, b] = hexRgb(h).map(lin); return 0.2126 *
 /** WCAG 2 contrast ratio, 1 to 21. */
 const contrast = (x, y) => { const a = luminance(x), b = luminance(y); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
 
-/** Push a colour's lightness away from the background until it reaches the contrast asked for. */
+/** OKLab distance between two colours: about 0.02 is just noticeable; 0.1 reads as a different colour. */
+const distance = (x, y) => { const p = toOklab(x), q = toOklab(y); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+
+/**
+ * Push a colour's lightness away from the background(s) by the smallest amount that reaches the
+ * contrast asked for. bg may be one colour or a list (all similar in lightness, such as paper and
+ * panel); the result meets min against every one.
+ */
 function fit(h, bg, min) {
-  if (contrast(h, bg) >= min) return h;
-  const [l0, a, b] = toOklab(h), up = lightness(bg) < 0.6;
-  for (let i = 1; i <= 50; i += 1) {
-    const c = fromOklab([up ? l0 + (1 - l0) * (i / 50) : l0 * (1 - i / 50), a, b]);
-    if (contrast(c, bg) >= min) return c;
-  }
-  return up ? '#ffffff' : '#000000';
+  const bgs = [].concat(bg);
+  const ok = (c) => bgs.every((x) => contrast(c, x) >= min);
+  if (ok(h)) return h;
+  const [l0, a, b] = toOklab(h), up = lightness(bgs[0]) < 0.6;
+  const at = (t) => fromOklab([up ? l0 + (1 - l0) * t : l0 * (1 - t), a, b]);
+  if (!ok(at(1))) return up ? '#ffffff' : '#000000';
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i += 1) { const mid = (lo + hi) / 2; if (ok(at(mid))) hi = mid; else lo = mid; }
+  return at(hi);
 }
 
 /* ---------- hue families, for giving jobs to a bare list of colours ---------- */
@@ -77,7 +103,7 @@ const inHue = (lo, hi) => (h) => { const x = hue(h); return chroma(h) > 0.06 && 
 const FAMILIES = {
   red: inHue(350, 45),
   warm: inHue(38, 110),
-  green: inHue(120, 165),
+  green: inHue(120, 175), // includes the teal-greens people read as "ok"
   blue: inHue(220, 285),
   any: () => true,
 };
@@ -139,8 +165,12 @@ function normPalette(p, signals) {
 /**
  * Turn a palette into the custom properties the page uses, for light or dark.
  * vivid keeps more of the palette's colour in the page background.
- * Tokens: paper, panel, ink, ink-soft, hair, field, accent, on-accent, ornament,
- *         inverse-bg, inverse-fg, and one per signal.
+ * Tokens: paper, panel, ink, ink-soft, hair, field, accent, accent-hover, accent-soft, on-accent,
+ *         ornament, inverse-bg, inverse-fg, and per signal: <signal>, <signal>-soft, on-<signal>.
+ * Text and border colours meet their targets on both paper and panel, since both are used as
+ * backgrounds. hair is decorative (dividers); use field for borders that show where a control is.
+ * A signal uses only its own colour (from the palette) or its fallback, never the accent, so it
+ * can't be mistaken for "attention". auditDistinct checks the result stays tellable apart.
  * extend(tokens, { dark, palette }) may return more tokens your app needs (aliases, toast colours,
  * colours fitted against something other than the panel); they are added to the result.
  */
@@ -157,19 +187,33 @@ function deriveTokens(palette, { dark = false, vivid = false, signals, extend } 
   } else {
     t.paper = vivid ? withLightness(deep, clamp(lightness(deep), 0.18, 0.26), 0.07) : withLightness(deep, clamp(lightness(deep), 0.14, 0.19), 0.03);
     t.panel = withLightness(deep, lightness(t.paper) + 0.045, vivid ? 0.06 : 0.025);
-    t.ink = fit(withLightness(pale, Math.max(lightness(pale), 0.92), 0.05), t.paper, 11);
+    // Off-white rather than the brightest possible: very bright text on a dark page glares.
+    t.ink = withLightness(pale, clamp(lightness(pale), 0.86, 0.92), 0.05);
   }
-  t['ink-soft'] = fit(mix(t.ink, t.panel, 0.42), t.panel, 4.8);
+  const surfaces = [t.paper, t.panel];
+  t.ink = fit(t.ink, surfaces, 11);
+  t['ink-soft'] = fit(mix(t.ink, t.panel, 0.42), surfaces, 4.8);
   t.hair = mix(t.ink, t.panel, 0.78);
-  t.field = fit(mix(t.ink, t.panel, 0.55), t.panel, 3.1);
-  t.accent = fit(r.accent, t.panel, 4.6);
-  t['on-accent'] = contrast(t.accent, t.panel) >= contrast(t.accent, t.ink) ? t.panel : t.ink;
-  t.ornament = fit(r.ornament, t.panel, 1.6);
+  t.field = fit(mix(t.ink, t.panel, 0.55), surfaces, 3.1);
+  t.accent = fit(r.accent, surfaces, 4.6);
+  const best = (c, list) => list.reduce((x, y) => (contrast(c, y) > contrast(c, x) ? y : x));
+  // Text on a filled colour: panel or ink if either reaches 4.5, else white or black (one always does).
+  const onFor = (c) => { const p = best(c, [t.panel, t.ink]); return contrast(c, p) >= 4.5 ? p : best(c, ['#ffffff', '#000000']); };
+  // A tinted background that ink stays readable on (≥ 7).
+  const softOf = (c) => { let k = dark ? 0.2 : 0.14; while (k > 0.04 && contrast(t.ink, mix(t.panel, c, k)) < 7) k -= 0.02; return mix(t.panel, c, k); };
+  const [lighter, darker] = lightness(t.panel) > lightness(t.ink) ? [t.panel, t.ink] : [t.ink, t.panel];
+  t['on-accent'] = onFor(t.accent);
+  // Hover/pressed: further from the text on it, so that text only gets easier to read.
+  t['accent-hover'] = mix(t.accent, lightness(t['on-accent']) > 0.5 ? darker : lighter, 0.18);
+  t['accent-soft'] = softOf(t.accent);
+  t.ornament = fit(r.ornament, surfaces, 1.6);
   t['inverse-bg'] = t.ink;
   t['inverse-fg'] = t.panel;
   for (const [name, s] of Object.entries(sig)) {
-    const own = r.signals[name] || byChroma([r.accent, r.ornament].filter((h) => s.family !== 'any' && FAMILIES[s.family](h)))[0];
-    t[name] = fit(own || s.fallback[dark ? 'dark' : 'light'], t.panel, s.min);
+    const c = fit(r.signals[name] || s.fallback[dark ? 'dark' : 'light'], surfaces, s.min);
+    t[`${name}-soft`] = softOf(c);
+    t[name] = fit(c, [...surfaces, t[`${name}-soft`]], s.min);
+    t[`on-${name}`] = onFor(t[name]);
   }
   return typeof extend === 'function' ? { ...t, ...extend({ ...t }, { dark, palette: r }) } : t;
 }
@@ -189,15 +233,49 @@ function themeCss(palette, opts = {}) {
     + `:root[data-theme="dark"]{${decl(dark, true)}}`;
 }
 
-/** Contrast of each token against the panel, with the target it was fitted to. For audits and tests. */
+/**
+ * Contrast of each token against every background it is used on, with its target.
+ * Returns [{ token, against, ratio, min, ok }]. For audits and tests.
+ */
 function auditTokens(t, signals) {
   const sig = normSignals(signals);
-  const targets = { ink: 11, 'ink-soft': 4.8, field: 3.1, accent: 4.6, ornament: 1.6 };
-  for (const [name, s] of Object.entries(sig)) targets[name] = s.min;
-  return Object.entries(targets).map(([name, min]) => {
-    const ratio = contrast(t[name], name === 'ink' ? t.paper : t.panel);
-    return { token: name, ratio: Math.round(ratio * 100) / 100, min, ok: ratio >= min - 0.01 };
+  const checks = [
+    ['ink', ['paper', 'panel'], 11], ['ink-soft', ['paper', 'panel'], 4.8], ['field', ['paper', 'panel'], 3.1],
+    ['accent', ['paper', 'panel'], 4.6], ['on-accent', ['accent', 'accent-hover'], 4.5], ['ink', ['accent-soft'], 7],
+    ['ornament', ['paper', 'panel'], 1.6],
+  ];
+  for (const [name, s] of Object.entries(sig)) {
+    checks.push([name, ['paper', 'panel', `${name}-soft`], s.min], [`on-${name}`, [name], 4.5], ['ink', [`${name}-soft`], 7]);
+  }
+  const rows = [];
+  for (const [token, against, min] of checks) {
+    for (const bg of against) {
+      if (!t[token] || !t[bg]) continue;
+      const ratio = contrast(t[token], t[bg]);
+      rows.push({ token, against: bg, ratio: Math.round(ratio * 100) / 100, min, ok: ratio >= min - 0.01 });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Colours that mean different things must look different. Checks each signal against the accent
+ * and the other signals (at min), and against the ornament (at half of min: decoration only has
+ * to not pass for a signal at a glance). Returns [{ token, against, distance, min, ok }], with
+ * distance in OKLab (about 0.02 is just noticeable). Colour alone still must never carry meaning.
+ */
+function auditDistinct(t, signals, min = 0.08) {
+  const names = Object.keys(normSignals(signals));
+  const rows = [];
+  names.forEach((name, i) => {
+    for (const other of ['accent', 'ornament', ...names.slice(i + 1)]) {
+      if (!t[name] || !t[other]) continue;
+      const need = other === 'ornament' ? min / 2 : min;
+      const d = distance(t[name], t[other]);
+      rows.push({ token: name, against: other, distance: Math.round(d * 1000) / 1000, min: need, ok: d >= need });
+    }
   });
+  return rows;
 }
 
 /* ---------- moods ----------
@@ -221,43 +299,61 @@ function setMoods(moods, root = globalThis.document && document.documentElement)
  *   fonts:    { fontValue: 'https://stylesheet-url' } loaded the first time that font is applied
  *   extend:   extra tokens, as for deriveTokens
  * }
- * A look is { theme?, mode, vivid, mood, palette, ...one value per layer }.
+ * A look is { theme, mode, vivid, mood, palette, ...one value per layer }. theme is the theme it
+ * started from; any field left out (or a null palette) comes from that theme.
+ * save() stores only the theme id and the fields the user changed, so when you update a theme's
+ * colours or layers, people who picked it see the update instead of a frozen copy.
  */
 function createLooks(config) {
   const { key, layers = {}, themes = {}, signals, extend, fonts = {} } = config;
   const MODES = ['auto', 'light', 'dark'];
-  const base = themes[config.default] || Object.values(themes)[0] || {};
+  const has = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(themes, id);
+  const defaultId = has(config.default) ? config.default : (Object.keys(themes)[0] ?? null);
   const loaded = new Set();
   const doc = globalThis.document;
+  const pal = (p) => { try { return normPalette(p, signals); } catch (e) { return null; } };
 
   function normalize(l) {
     l = l && typeof l === 'object' ? l : {};
+    const theme = has(l.theme) ? l.theme : defaultId;
+    // Anything a theme leaves out comes from the default theme, then the layer's first value.
+    const base = { ...(defaultId ? themes[defaultId] : {}), ...(theme ? themes[theme] : {}) };
     const out = {
+      theme,
       mode: MODES.includes(l.mode) ? l.mode : (MODES.includes(base.mode) ? base.mode : 'auto'),
       vivid: 'vivid' in l ? !!l.vivid : !!base.vivid,
       mood: l.mood !== false,
-      palette: null,
+      palette: pal(l.palette != null ? l.palette : base.palette),
     };
     for (const [layer, values] of Object.entries(layers)) {
       out[layer] = values.includes(l[layer]) ? l[layer] : (values.includes(base[layer]) ? base[layer] : values[0]);
     }
-    try { out.palette = normPalette(l.palette !== undefined ? l.palette : base.palette, signals); } catch (e) { out.palette = null; }
     return out;
   }
   const fields = ['mode', 'vivid', ...Object.keys(layers)];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const matches = (l, id) => { const t = normalize({ theme: id }); return fields.every((f) => t[f] === l[f]) && same(t.palette, l.palette); };
   /** The theme id this look matches exactly, or null once something was changed by hand. */
   function themeOf(look) {
     const l = normalize(look);
-    return Object.keys(themes).find((id) => { const t = normalize(themes[id]); return fields.every((f) => t[f] === l[f]) && same(t.palette, l.palette); }) || null;
+    return [l.theme, ...Object.keys(themes)].find((id) => id && matches(l, id)) || null;
   }
   /** The look for a theme, keeping the user's text size and mood setting. */
   function fromTheme(id, keep = {}) {
-    const t = themes[id] || {};
-    const l = normalize({ ...t, palette: t.palette });
-    if (keep.size && layers.size) l.size = keep.size;
-    if ('mood' in keep) l.mood = keep.mood;
+    const l = normalize({ theme: id });
+    if (keep.size && layers.size && layers.size.includes(keep.size)) l.size = keep.size;
+    if ('mood' in keep) l.mood = !!keep.mood;
     return l;
+  }
+  /** What save() stores: the theme id plus only the fields that differ from that theme. */
+  function compact(look) {
+    const l = normalize(look);
+    const t = l.theme ? normalize({ theme: l.theme }) : null;
+    const out = { theme: l.theme };
+    if (!l.mood) out.mood = false;
+    for (const f of fields) if (!t || t[f] !== l[f]) out[f] = l[f];
+    if (!t || !same(t.palette, l.palette)) out.palette = l.palette;
+    return out;
   }
   const prefersDark = () => !!(globalThis.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   /** The colours a look shows right now, for previews. */
@@ -288,11 +384,11 @@ function createLooks(config) {
   }
   function save(look) {
     const l = normalize(look);
-    if (key) { try { localStorage.setItem(key, JSON.stringify(l)); } catch (e) { /* private mode: keep going */ } }
+    if (key) { try { localStorage.setItem(key, JSON.stringify(compact(l))); } catch (e) { /* private mode: keep going */ } }
     return apply(l);
   }
-  return { normalize, themeOf, fromTheme, tokens, apply, load, save, themes, layers };
+  return { normalize, themeOf, fromTheme, compact, tokens, apply, load, save, themes, layers };
 }
 
-globalThis.RolePalette = { isHex, toOklab, fromOklab, lightness, chroma, hue, withLightness, mix, contrast, fit, FAMILIES, DEFAULT_SIGNALS, assignJobs, normPalette, deriveTokens, themeCss, auditTokens, setMoods, createLooks };
+globalThis.RolePalette = { isHex, toOklab, fromOklab, lightness, chroma, hue, withLightness, mix, contrast, distance, fit, FAMILIES, DEFAULT_SIGNALS, assignJobs, normPalette, deriveTokens, themeCss, auditTokens, auditDistinct, setMoods, createLooks };
 })();

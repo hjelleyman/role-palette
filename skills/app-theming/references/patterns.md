@@ -31,7 +31,8 @@ body { background: var(--paper); color: var(--ink); }
 body { font-family: var(--face, system-ui, sans-serif); }
 
 :root[data-density="s"] { --gap: 8px; }  :root[data-density="m"] { --gap: 14px; }  :root[data-density="l"] { --gap: 22px; }
-:root[data-size="s"] { font-size: 15px; } :root[data-size="m"] { font-size: 17px; } :root[data-size="l"] { font-size: 20px; }
+/* Percentages, never px: a px root size overrides the text size the user set in their browser. */
+:root[data-size="s"] { font-size: 93.75%; } :root[data-size="m"] { font-size: 106.25%; } :root[data-size="l"] { font-size: 125%; }
 ```
 
 ## Moods: one state, a different look per structure style

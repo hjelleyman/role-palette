@@ -27,7 +27,7 @@
       night: { name: 'Night shift', blurb: 'Soft panels in deep blue', mode: 'dark', vivid: true, style: 'soft', font: 'sans', density: 'l',
         palette: ['#0f1222', '#e6e9f5', '#7aa2ff', '#ff5d73', '#38d39f', '#5b4b8a'] },
       phosphor: { name: 'Phosphor', blurb: 'Green screen, dashed frames', mode: 'dark', vivid: true, style: 'terminal', font: 'mono', density: 's',
-        palette: { paper: '#03140a', ink: '#c8ffd0', accent: '#5dff7a', ornament: '#14532d', signals: { danger: '#ff5c5c', success: '#5dff7a' } } },
+        palette: { paper: '#03140a', ink: '#c8ffd0', accent: '#6ee7ff', ornament: '#14532d', signals: { danger: '#ff5c5c', success: '#5dff7a' } } },
       meadow: { name: 'Meadow', blurb: 'Colours given jobs automatically from a list', mode: 'light', vivid: true, style: 'soft', font: 'serif', density: 'm',
         palette: ['#fbf6e9', '#283618', '#606c38', '#dda15e', '#bc6c25', '#c1121f'] },
     },
@@ -46,7 +46,8 @@
   :root[data-font="serif"] { --face: Georgia, Cambria, 'Times New Roman', serif; }
   :root[data-font="mono"] { --face: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace; }
   :root[data-density="s"] { --gap: 8px; } :root[data-density="l"] { --gap: 22px; }
-  :root[data-size="s"] { font-size: 15px; } :root[data-size="m"] { font-size: 17px; } :root[data-size="l"] { font-size: 20px; }
+  /* Percentages, so the user's own browser text size still counts (15/17/20px at the 16px default). */
+  :root[data-size="s"] { font-size: 93.75%; } :root[data-size="m"] { font-size: 106.25%; } :root[data-size="l"] { font-size: 125%; }
 
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink); font: 1rem/1.5 var(--face, system-ui, sans-serif); transition: background .3s, color .3s; }
@@ -186,8 +187,10 @@
 
     const t = looks.tokens(look);
     const audit = document.getElementById('audit');
-    audit.innerHTML = t ? RP.auditTokens(t, { danger: {}, success: {} }).map((r) =>
-      `<tr><td>${r.token}</td><td>${r.ratio.toFixed(1)} : 1</td><td class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ≥ ${r.min}</td></tr>`).join('') : '';
+    const sig = { danger: {}, success: {} };
+    const row = (label, value, r) => `<tr><td>${label}</td><td>${value}</td><td class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ≥ ${r.min}</td></tr>`;
+    audit.innerHTML = t ? RP.auditTokens(t, sig).map((r) => row(`${r.token} on ${r.against}`, `${r.ratio.toFixed(1)} : 1`, r)).join('')
+      + RP.auditDistinct(t, sig).map((r) => row(`${r.token} vs ${r.against}`, `Δ ${r.distance.toFixed(2)}`, r)).join('') : '';
   }
 
   const state = { alert: false, offline: false };
